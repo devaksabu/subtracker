@@ -23,10 +23,154 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Clean and Rebuild Scaffolding
+      - name: Regenerate Clean Android Project & Configure Widget
         run: |
-          flutter clean
-          flutter pub get
+          # 1. Remove existing legacy android directory completely
+          rm -rf android
+
+          # 2. Re-create brand new modern Flutter Android scaffolding (v2 embedding guaranteed)
+          flutter create . --platforms=android --org=com.example
+
+          # 3. Create required layout and drawable folders for the widget
+          mkdir -p android/app/src/main/res/layout
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/xml
+          mkdir -p android/app/src/main/kotlin/com/example/subtracker
+
+          # 4. Write widget XML layout
+          cat << 'EOF' > android/app/src/main/res/layout/subscription_widget.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/widget_container"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="16dp"
+              android:background="@drawable/widget_bg">
+
+              <TextView
+                  android:id="@+id/widget_header"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="NEXT UPCOMING RECHARGE"
+                  android:textColor="#94A3B8"
+                  android:textSize="10sp"
+                  android:textStyle="bold"
+                  android:letterSpacing="0.05" />
+
+              <TextView
+                  android:id="@+id/widget_service_title"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="4dp"
+                  android:text="Jio Mobile"
+                  android:textColor="#FFFFFF"
+                  android:textSize="18sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/widget_due_details"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="2dp"
+                  android:text="Due in 4d • ₹749"
+                  android:textColor="#38BDF8"
+                  android:textSize="13sp" />
+
+              <View
+                  android:layout_width="match_parent"
+                  android:layout_height="1dp"
+                  android:layout_marginTop="10dp"
+                  android:layout_marginBottom="6dp"
+                  android:background="#334155" />
+
+              <TextView
+                  android:id="@+id/widget_total_spend"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Monthly: ₹1,398"
+                  android:textColor="#94A3B8"
+                  android:textSize="11sp" />
+          </LinearLayout>
+          EOF
+
+          # 5. Write widget background drawable
+          cat << 'EOF' > android/app/src/main/res/drawable/widget_bg.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android"
+              android:shape="rectangle">
+              <solid android:color="#1E293B" />
+              <corners android:radius="20dp" />
+              <stroke android:width="1dp" android:color="#334155" />
+          </shape>
+          EOF
+
+          # 6. Write widget metadata XML
+          cat << 'EOF' > android/app/src/main/res/xml/subscription_widget_info.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="180dp"
+              android:minHeight="110dp"
+              android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/subscription_widget"
+              android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen">
+          </appwidget-provider>
+          EOF
+
+          # 7. Write SubscriptionWidgetProvider.kt
+          cat << 'EOF' > android/app/src/main/kotlin/com/example/subtracker/SubscriptionWidgetProvider.kt
+          package com.example.subtracker
+
+          import android.app.PendingIntent
+          import android.appwidget.AppWidgetManager
+          import android.content.Context
+          import android.content.Intent
+          import android.content.SharedPreferences
+          import android.widget.RemoteViews
+          import es.antonborri.home_widget.HomeWidgetProvider
+
+          class SubscriptionWidgetProvider : HomeWidgetProvider() {
+              override fun onUpdate(
+                  context: Context,
+                  appWidgetManager: AppWidgetManager,
+                  appWidgetIds: IntArray,
+                  widgetData: SharedPreferences
+              ) {
+                  for (appWidgetId in appWidgetIds) {
+                      val serviceName = widgetData.getString("service_name", "No upcoming bills")
+                      val dueInfo = widgetData.getString("due_info", "Add subscriptions in app")
+                      val totalMonthly = widgetData.getString("total_monthly", "₹0")
+
+                      val intent = Intent(context, MainActivity::class.java)
+                      val pendingIntent = PendingIntent.getActivity(
+                          context, 0, intent,
+                          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                      )
+
+                      val views = RemoteViews(context.packageName, R.layout.subscription_widget).apply {
+                          setTextViewText(R.id.widget_service_title, serviceName)
+                          setTextViewText(R.id.widget_due_details, dueInfo)
+                          setTextViewText(R.id.widget_total_spend, "Monthly: $totalMonthly")
+                          setOnClickPendingIntent(R.id.widget_container, pendingIntent)
+                      }
+                      appWidgetManager.updateAppWidget(appWidgetId, views)
+                  }
+              }
+          }
+          EOF
+
+          # 8. Register Widget Receiver in AndroidManifest.xml
+          sed -i '/<\/application>/i \        <receiver android:name=".SubscriptionWidgetProvider" android:exported="true">\n            <intent-filter>\n                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />\n            </intent-filter>\n            <meta-data android:name="android.appwidget.provider" android:resource="@xml/subscription_widget_info" />\n        </receiver>' android/app/src/main/AndroidManifest.xml
+
+          # 9. Set compileSdkVersion and minSdkVersion to satisfy Android 14+ dependencies
+          sed -i 's/compileSdk = .*/compileSdk = 36/' android/app/build.gradle.kts || true
+          sed -i 's/compileSdkVersion .*/compileSdkVersion 36/' android/app/build.gradle || true
+          sed -i 's/minSdk = .*/minSdk = 23/' android/app/build.gradle.kts || true
+          sed -i 's/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle || true
+
+      - name: Install Dependencies
+        run: flutter pub get
 
       - name: Build Release APK
         run: flutter build apk --release
