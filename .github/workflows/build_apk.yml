@@ -23,13 +23,10 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Recreate Android Embedding scaffolding
+      - name: Clean and Rebuild Scaffolding
         run: |
-          # Recreates modern Android v2 scaffolding without overwriting your Dart code
-          flutter create . --platforms=android --org=com.example
-
-      - name: Install Dependencies
-        run: flutter pub get
+          flutter clean
+          flutter pub get
 
       - name: Build Release APK
         run: flutter build apk --release
