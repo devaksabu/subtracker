@@ -15,7 +15,7 @@ class SubscriptionItem {
   final String name;
   final double amount;
   final DateTime dueDate;
-  final String category; // e.g. Mobile, OTT, Utility
+  final String category;
 
   SubscriptionItem({
     required this.id,
@@ -34,11 +34,11 @@ class SubscriptionItem {
       };
 
   factory SubscriptionItem.fromMap(Map<String, dynamic> map) => SubscriptionItem(
-        id: map['id'],
-        name: map['name'],
+        id: map['id'] as String,
+        name: map['name'] as String,
         amount: (map['amount'] as num).toDouble(),
-        dueDate: DateTime.parse(map['dueDate']),
-        category: map['category'] ?? 'General',
+        dueDate: DateTime.parse(map['dueDate'] as String),
+        category: (map['category'] as String?) ?? 'General',
       );
 }
 
@@ -89,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     } else {
-      // Default sample items
       setState(() {
         _items = [
           SubscriptionItem(
@@ -126,25 +125,24 @@ class _HomeScreenState extends State<HomeScreen> {
       await HomeWidget.saveWidgetData<String>('due_info', 'All clear!');
       await HomeWidget.saveWidgetData<String>('total_monthly', '₹0');
     } else {
-      // Pick the earliest due
       final next = _items.first;
       final daysLeft = next.dueDate.difference(DateTime.now()).inDays;
       String dueStr;
       if (daysLeft < 0) {
-        dueStr = 'Overdue by \${daysLeft.abs()}d';
+        dueStr = 'Overdue by ${daysLeft.abs()}d';
       } else if (daysLeft == 0) {
         dueStr = 'Due today!';
       } else {
-        dueStr = 'Due in \${daysLeft}d';
+        dueStr = 'Due in ${daysLeft}d';
       }
 
       final total = _items.fold<double>(0, (sum, item) => sum + item.amount);
 
       await HomeWidget.saveWidgetData<String>('service_name', next.name);
       await HomeWidget.saveWidgetData<String>(
-          'due_info', '$dueStr • ₹\${next.amount.toStringAsFixed(0)}');
+          'due_info', '$dueStr • ₹${next.amount.toStringAsFixed(0)}');
       await HomeWidget.saveWidgetData<String>(
-          'total_monthly', '₹\${total.toStringAsFixed(0)}');
+          'total_monthly', '₹${total.toStringAsFixed(0)}');
     }
 
     await HomeWidget.updateWidget(
@@ -213,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Due Date: \${DateFormat('dd MMM yyyy').format(selectedDate)}',
+                      'Due Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}',
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),
@@ -289,7 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       final idx = _items.indexWhere((i) => i.id == item.id);
       if (idx != -1) {
-        // Roll forward by 30 days
         _items[idx] = SubscriptionItem(
           id: item.id,
           name: item.name,
@@ -302,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _persistAndSync();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Rolled \${item.name} forward 30 days!')),
+      SnackBar(content: Text('Rolled ${item.name} forward 30 days!')),
     );
   }
 
@@ -359,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Text('Total Monthly Spend',
                               style: TextStyle(color: Colors.white70, fontSize: 13)),
                           const SizedBox(height: 4),
-                          Text('₹\${totalMonthly.toStringAsFixed(0)}',
+                          Text('₹${totalMonthly.toStringAsFixed(0)}',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 26,
@@ -372,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Text('Active Subscriptions',
                               style: TextStyle(color: Colors.white70, fontSize: 13)),
                           const SizedBox(height: 4),
-                          Text('\${_items.length}',
+                          Text('${_items.length}',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 24,
@@ -407,6 +404,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             final item = _items[idx];
                             final daysLeft = item.dueDate.difference(DateTime.now()).inDays;
                             final isDueSoon = daysLeft <= 3;
+                            final formattedDate = DateFormat('dd MMM').format(item.dueDate);
+                            final daysText = daysLeft < 0 ? 'Overdue' : '$daysLeft days left';
 
                             return Dismissible(
                               key: Key(item.id),
@@ -456,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Due \${DateFormat('dd MMM').format(item.dueDate)} (\${daysLeft < 0 ? "Overdue" : "$daysLeft days left"})',
+                                            'Due $formattedDate ($daysText)',
                                             style: TextStyle(
                                               color: isDueSoon ? Colors.amber : Colors.grey,
                                               fontSize: 12,
@@ -468,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text('₹\${item.amount.toStringAsFixed(0)}',
+                                        Text('₹${item.amount.toStringAsFixed(0)}',
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.bold,
