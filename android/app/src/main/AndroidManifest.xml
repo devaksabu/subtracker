@@ -4,6 +4,11 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
+        <!-- This tag is REQUIRED by Flutter to identify the Android v2 embedding -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,6 +28,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Widget Receiver -->
         <receiver
             android:name=".SubscriptionWidgetProvider"
             android:exported="true">
